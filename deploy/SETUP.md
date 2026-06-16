@@ -16,6 +16,35 @@ Everything below assumes your branch: `github.com/ryanamcc88-prog/TradingAgents`
 
 ---
 
+## Bayside server specifics (read this, it overrides the generic bits below)
+
+Your n8n runs in Docker on the server, on the `bayside-net` network (containers `n8n`
+and `n8n-postgres`), bound to `127.0.0.1:5678`. Do all of this in the Remote Desktop
+session on the server. Run the engine on the SAME network so n8n calls it by name.
+
+Run the engine (after building, see Step 2):
+
+```
+docker run -d --name tradingagents-api --network bayside-net -p 127.0.0.1:8000:8000 --env-file .env tradingagents-api
+```
+
+Then in the n8n workflow set `TA_API_URL` to:
+
+```
+http://tradingagents-api:8000
+```
+
+(container-to-container on `bayside-net`, no internet hop). The `-p 127.0.0.1:8000:8000`
+is only so you can smoke-test from the server host with `curl http://localhost:8000/health`.
+
+Two house rules to keep this consistent with the rest of your ecosystem:
+- Provider is Anthropic (Claude). Generate the engine's `ANTHROPIC_API_KEY` inside the
+  "Bayside n8n" Anthropic workspace so the US$30 cap governs it.
+- Set this workflow's Error Workflow to "00 - Global Error Handler" (Workflow settings),
+  same as your other flows.
+
+---
+
 ## Step 1 - Add the wrapper files to your repo
 
 Copy `api_server.py`, `requirements-api.txt`, `Dockerfile.api` and `.env.example`
@@ -96,26 +125,4 @@ Schedule (weekdays 8am)
        -> Log to Google Sheet (every decision, for honest review later)
        -> Actionable?      (BUY or SELL -> alert; HOLD -> just logged)
             -> Telegram Alert
-  -> All Done
-```
-
-In Phase 1 the "risk gate" only computes an advisory position size and decides whether
-to alert. It does not place any orders. When you move to Phase 2 you add a broker node
-after the gate and let it place **paper** orders, with the same caps now enforced for
-real.
-
-## Keeping cost down
-
-- Small watchlist (3 to 5 tickers). Cost scales with the number of tickers per run.
-- Cheap models in `.env` (`gpt-5.4-mini` for both deep and quick to start).
-- `TRADINGAGENTS_MAX_DEBATE_ROUNDS=1` and `TRADINGAGENTS_MAX_RISK_ROUNDS=1`.
-- Trim analysts: `TA_SELECTED_ANALYSTS=market,news` is the cheapest useful set.
-- Run daily, not intraday, while you are learning.
-
-## Notes / caveats
-
-- The wrapper was built against your fork's current API (`TradingAgentsGraph.propagate`
-  returns a `(state, rating)` pair; rating is one of Buy / Overweight / Hold /
-  Underweight / Sell). I verified this against the source but have not run a live
-  analysis from here (that needs your API key and spends money). Smoke-test in Step 2.
-- This is a research tool. Treat the decisions as one input, not gospel. No financial advice.
+  ->
