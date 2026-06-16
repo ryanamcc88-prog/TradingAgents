@@ -1,0 +1,5 @@
+# Extra deps for the n8n HTTP wrapper, on top of the TradingAgents repo's own deps.
+# Install with:  pip install -r requirements-api.txt
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
